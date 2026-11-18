@@ -1,0 +1,431 @@
+---
+title: "Guideline and Delivery Gaps in Undiagnosed Diabetes, Prediabetes, and Hypertension Among US Adults"
+output:
+  word_document:
+    reference_docx: reference.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, dpi = 300)
+library(dplyr); library(flextable); library(officer)
+root <- normalizePath("..")
+res <- readRDS(file.path(root, "output/res_main.rds"))
+ml  <- readRDS(file.path(root, "output/res_ml.rds"))
+tb  <- readRDS(file.path(root, "output/tables.rds"))
+fc  <- readRDS(file.path(root, "output/flow_counts.rds"))
+f2  <- readRDS(file.path(root, "output/fig2_data.rds"))
+htc <- readRDS(file.path(root, "output/htn_cascade.rds"))
+FL  <- fc |> filter(cycle == "2021-2023"); FP <- fc |> filter(cycle == "2017-2020")
+n   <- function(x) format(x, big.mark = ",")
+r1  <- function(x) formatC(x, format = "f", digits = 1)
+r0  <- function(x) formatC(x, format = "f", digits = 0)
+ci  <- function(p, lo, hi) paste0(r1(p), "% (95% CI, ", r1(lo), "%-", r1(hi), "%)")
+cib <- function(p, lo, hi) paste0(r1(p), "% [95% CI, ", r1(lo), "%-", r1(hi), "%]")
+cin <- function(N, lo, hi) paste0(r1(N), " million (95% CI, ", r1(lo), "-", r1(hi), " million)")
+g   <- function(df, ...) filter(df, ...)
+prev <- res$prev
+pdm <- prev[1, ]; ppre <- prev[2, ]; ph130 <- prev[3, ]; ph140 <- prev[4, ]
+o <- res$outside
+o_dm_u <- g(o, outcome == "Undiagnosed diabetes", rule == "USPSTF 2021")
+o_pr_u <- g(o, outcome == "Undiagnosed prediabetes", rule == "USPSTF 2021")
+o_pr_a <- g(o, outcome == "Undiagnosed prediabetes", rule == "ADA 2025")
+rs <- res$reasons
+rr <- function(out, rsn) g(rs, outcome == out, reason == rsn)
+cs <- res$cascade
+cc <- function(out, rl, st) g(cs, outcome == out, rule == rl, stage == st)
+ev <- ml$eval
+e  <- function(out, rl) g(ev, outcome == out, rule == rl)
+U  <- e("undx_dm", "USPSTF 2021"); A <- e("undx_dm", "ADA 2025")
+M  <- e("undx_dm", "Risk model, volume matched to USPSTF")
+C80 <- e("undx_dm", "Conformal rule, target sensitivity 80%")
+C90 <- e("undx_dm", "Conformal rule, target sensitivity 90%")
+C95 <- e("undx_dm", "Conformal rule, target sensitivity 95%")
+DU <- e("undx_dysgly", "USPSTF 2021"); DA <- e("undx_dysgly", "ADA 2025")
+D90 <- e("undx_dysgly", "Conformal rule, target sensitivity 90%")
+D95 <- e("undx_dysgly", "Conformal rule, target sensitivity 95%")
+auc_dm <- g(ml$undx_dm$auc, model == "glm"); auc_dmx <- g(ml$undx_dm$auc, model == "xgb")
+auc_dg <- g(ml$undx_dysgly$auc, model == "glm")
+ec <- res$elig_care
+ht <- res$htn
+h  <- function(out, mm) g(ht, outcome == out, grepl(mm, m))
+H130 <- "Undiagnosed hypertension (>=130/80)"; H140 <- "Undiagnosed hypertension (>=140/90)"
+mc <- res$missed_comp
+fp <- function(pan, v, l) g(f2, grepl(pan, panel), var == v, level == l)
+se <- res$sens
+ss <- ml$sub_sens
+sets <- ml$sets
+t1 <- as.data.frame(tb$t1)
+test_dm <- as.numeric(t1[t1$Characteristic == "Reported glucose test in past 3 y, %", 3])
+tested_all <- as.numeric(t1[t1$Characteristic == "Reported glucose test in past 3 y, %", 2])
+ub <- function(k) r1(100 * (1 - 0.025^(1 / k)))
+```
+
+```{r ft, include=FALSE}
+jama_ft <- function(df, widths = NULL, fs = 8) {
+  ft <- flextable(df) |> font(fontname = "Arial", part = "all") |> fontsize(size = fs, part = "all") |>
+    bold(part = "header") |> border_remove() |>
+    hline_top(border = fp_border(width = 1), part = "header") |>
+    hline_bottom(border = fp_border(width = 1), part = "header") |>
+    hline_bottom(border = fp_border(width = 1), part = "body") |>
+    align(j = -1, align = "center", part = "all") |> align(j = 1, align = "left", part = "all") |>
+    valign(valign = "top", part = "all") |> padding(padding = 1.5, part = "all")
+  if (!is.null(widths)) ft <- width(ft, width = widths) else ft <- autofit(ft)
+  ft
+}
+```
+
+**Short title:** Guideline and Delivery Gaps in Undiagnosed Disease
+
+**Authors:** [First Author, degrees]^1^; [Coauthor, degrees]^2^; [Senior Author, degrees]^1^
+
+**Affiliations:** ^1^[Department, Institution, City, State]; ^2^[Department, Institution, City, State]
+
+**Corresponding author:** [Name, address, email]
+
+**Manuscript word count:** 2,998 (Introduction through Conclusions); **Abstract:** 346 words; **Tables:** 2; **Figures:** 3; **Supplement:** 1
+
+\newpage
+
+## Key Points
+
+**Question** Among US adults with undiagnosed diabetes, prediabetes, or hypertension, what share fall outside screening recommendations, and how many go undetected despite eligibility and access to care?
+
+**Findings** In this cross-sectional study of `r n(FL$n_dm_final)` adults (NHANES 2021-2023), `r r0(o_dm_u$p)`% of undiagnosed diabetes and `r r0(o_pr_u$p)`% of undiagnosed prediabetes fell outside USPSTF criteria, mostly because of the upper age limit, yet `r r0(test_dm)`% of adults with undiagnosed diabetes reported a recent glucose test. At equal screening volume, a nonlaboratory risk model detected `r r0(M$sens)`% vs `r r0(U$sens)`% of undiagnosed diabetes.
+
+**Meaning** Most undiagnosed cardiometabolic disease lies within existing recommendations and routine care.
+
+\newpage
+
+## Abstract
+
+**Importance** It is unclear how many adults with undetected diabetes or hypertension fall outside screening recommendations rather than being missed despite eligibility.
+
+**Objective** To estimate the share of US adults with undiagnosed diabetes, prediabetes, and hypertension who fall outside screening criteria, separate this guideline gap from gaps in care contact, and test a conformal risk-based screening rule.
+
+**Design, Setting, and Participants** This cross-sectional study used the National Health and Nutrition Examination Survey (NHANES) August 2021-August 2023; a risk model was developed in NHANES 2017-March 2020 and validated in the later cycle. Participants were examined, nonpregnant adults aged 20 years or older.
+
+**Exposures** Eligibility under 2021 US Preventive Services Task Force (USPSTF) and 2025 American Diabetes Association (ADA) criteria; insurance, usual source of care, and a glucose test in the past 3 years.
+
+**Main Outcomes and Measures** Undiagnosed diabetes (hemoglobin A~1c~ [HbA~1c~] ≥6.5%), prediabetes (HbA~1c~ 5.7%-6.4%), and hypertension (blood pressure ≥130/80 mm Hg) in adults without a prior diagnosis.
+
+**Results** Among `r n(FL$n_dm_final)` adults, `r n(FL$n_undx_dm)` had undiagnosed diabetes (weighted prevalence, `r cib(pdm$p, pdm$lo, pdm$hi)`; `r r1(pdm$N)` million adults). USPSTF criteria excluded `r ci(o_dm_u$p, o_dm_u$lo, o_dm_u$hi)` of undiagnosed diabetes and `r ci(o_pr_u$p, o_pr_u$lo, o_pr_u$hi)` of undiagnosed prediabetes; adults older than 70 years accounted for `r r0(rr("Undiagnosed diabetes", "Older than 70 y")$p)`% of undiagnosed diabetes. ADA criteria excluded no undiagnosed diabetes but applied to `r r1(A$volume)`% of adults without diagnosed diabetes. Among adults with undiagnosed diabetes, `r r1(test_dm)`% reported a glucose test in the past 3 years. Of `r r1(ph130$N)` million adults with undiagnosed hypertension, `r r1(h(H130, "Insured with")$p)`% were insured with a usual source of care. In temporal validation, a nonlaboratory risk model (area under the curve, `r formatC(auc_dm$auc, format = "f", digits = 2)`) flagging `r r1(M$volume)`% of adults detected `r ci(M$sens, M$sens_lo, M$sens_hi)` of undiagnosed diabetes vs `r r1(U$sens)`% for USPSTF criteria flagging `r r1(U$volume)`%. Conformal rules met sensitivity targets for dysglycemia but not the 90% target for diabetes (`r r1(C90$sens)`%).
+
+**Conclusions and Relevance** In this cross-sectional study, the main USPSTF gap was its upper age limit, and broader ADA criteria approached universal screening. Most undiagnosed diabetes and hypertension occurred in adults already eligible and in care, suggesting that follow-through on testing and abnormal results may matter more than widening eligibility.
+
+\newpage
+
+## Introduction
+
+Millions of US adults have diabetes or hypertension that has never been diagnosed.{{fang2022,gwira2024,fryar2024}} Both conditions are silent until complications appear, and both respond to inexpensive treatment.{{dpp2002,herman2015}} The 2021 US Preventive Services Task Force (USPSTF) recommendation advises screening for prediabetes and type 2 diabetes in adults aged 35 to 70 years with overweight or obesity.{{uspstf_dm}} The American Diabetes Association (ADA) casts a wider net: everyone from age 35 years, plus younger adults with overweight and at least 1 risk factor.{{ada2025}} For hypertension, the USPSTF recommends screening all adults, annually from age 40 years or with increased risk and every 3 to 5 years otherwise.{{uspstf_htn}}
+
+Earlier National Health and Nutrition Examination Survey (NHANES) analyses asked how well age and body mass index (BMI) thresholds capture undiagnosed dysglycemia and showed that uniform thresholds miss relatively more cases among Asian, Black, and Hispanic adults.{{obrien2018,aggarwal2022,uspstf_eval}} Two questions remain open. None of this work used the August 2021-August 2023 cycle, the first full cycle after the COVID-19 pandemic disrupted routine care. And studies of guideline sensitivity usually stop at eligibility. A person can meet every criterion and still go undiagnosed because they lack insurance or a regular clinician, or because a test result was never acted on. Care cascade analyses already trace adults with hypertension from disease through awareness, treatment, and control, in the US and in lower-income settings.{{fryar2024,nahin_cascade}} We apply the same logic one step earlier, asking where undiagnosed people sit relative to screening rules and to care. If most sit within both, rewriting eligibility rules will do little.
+
+Risk prediction offers a third option, but risk scores usually come with an arbitrary threshold and no assurance about how many cases it will catch. Conformal prediction converts any risk score into a decision rule with a prespecified coverage level, provided new patients resemble the calibration sample.{{vovk,angelopoulos,conformal_clin}} Related work from our group, currently under peer review, applies conformal prediction to several cardiometabolic outcomes at once (Nahin KSA, Hossen A, Asha AS, et al; unpublished data, 2026). Whether the guarantee holds across survey cycles, and whether such a rule beats guideline criteria, has not been tested.
+
+We estimated how many US adults with undiagnosed diabetes, prediabetes, and hypertension fall outside current recommendations, separated this guideline gap from gaps in care contact, and compared guideline rules with a conformal risk-based rule developed before the pandemic and validated in 2021-2023.
+
+## Methods
+
+### Data Source and Participants
+
+NHANES is a continuous, multistage probability survey of the civilian noninstitutionalized US population, combining a household interview with a standardized examination that includes blood pressure (BP) measurement and phlebotomy.{{nhanes_design}} We used the August 2021-August 2023 cycle for all prevalence and eligibility estimates. The 2017-March 2020 prepandemic files,{{stierman2021}} which used the same oscillometric BP protocol, served as the model development sample and for pooled sensitivity analyses. The NCHS Research Ethics Review Board approved NHANES, and participants gave written informed consent; this analysis of deidentified public data required no additional review. We followed the STROBE and TRIPOD+AI reporting guidelines.{{strobe,tripod}}
+
+We included examined, nonpregnant adults aged 20 years or older. The diabetes sample required an HbA~1c~ value, a response to the diabetes history question, and measured BMI; the hypertension sample required at least 1 valid BP reading, a response to the BP history question, and measured BMI (eFigure 1 in Supplement 1).
+
+### Outcomes
+
+Undiagnosed diabetes was HbA~1c~ of 6.5% or higher in an adult never told by a clinician that they had diabetes (outside pregnancy). Undiagnosed prediabetes was HbA~1c~ of 5.7% to 6.4% in an adult never told they had diabetes, prediabetes, or borderline diabetes. HbA~1c~ was used because it was measured in the full examination sample; fasting plasma glucose (FPG) was measured only in a morning subsample.
+
+BP was the mean of up to 3 oscillometric readings. Undiagnosed hypertension was mean BP of 130/80 mm Hg or higher, consistent with the 2017 and 2025 American College of Cardiology/American Heart Association guidelines,{{acc2017,aha2025}} in an adult never told they had high BP and not taking BP medication. Because a single-visit threshold of 130/80 mm Hg captures mild or transient elevation, we also report 140/90 mm Hg.
+
+### Screening Criteria
+
+USPSTF diabetes eligibility was age 35 to 70 years with BMI of 25 or higher (23 or higher for Asian adults, per the clinical considerations).{{uspstf_dm,hsu2015}} ADA eligibility was age 35 years or older, prior notification of prediabetes, or BMI of 25 or higher (23 for Asian adults) plus at least 1 risk factor available in NHANES: race and ethnicity other than non-Hispanic White, cardiovascular disease, hypertension (diagnosed, treated, or BP ≥130/80 mm Hg), high-density lipoprotein cholesterol below 35 mg/dL or triglycerides above 250 mg/dL, or no leisure-time physical activity.{{ada2025}} Family history and gestational diabetes were not collected in 2021-2023; we examined them in 2017-2020 (eTable 1 in Supplement 1).
+
+Because the USPSTF recommends hypertension screening for all adults, we instead identified adults on the less intensive schedule (every 3-5 years): those aged 20 to 39 years who were not Black and had BMI below 25. Prior BP readings were unavailable, so this approximates the USPSTF definition of increased risk.{{uspstf_htn}}
+
+### Health Care Contact
+
+We used 3 measures of contact with care: current health insurance, a usual place for health care, and a self-reported blood test for high blood sugar or diabetes in the past 3 years. Each undiagnosed case was assigned to 1 of 4 mutually exclusive categories: outside criteria; eligible but uninsured or without a usual source of care; eligible and in care without a recent glucose test; and eligible, in care, and tested. The last 2 categories form what we call the delivery gap: disease that went undetected although criteria and access were in place.
+
+### Risk Model and Conformal Screening Rule
+
+The model for undiagnosed diabetes used 17 nonlaboratory predictors measured the same way in both cycles: age, sex, race and ethnicity, BMI, waist circumference, systolic and diastolic BP, diagnosed hypertension, cardiovascular disease, smoking, physical inactivity, education, income-to-poverty ratio, nativity, insurance, usual source of care, and prior notification of prediabetes. The development sample comprised `r n(FP$n_dm_nodx)` adults without diagnosed diabetes in 2017-March 2020 (`r n(FP$n_undx_dm)` with undiagnosed diabetes), split within outcome strata into training (70%) and calibration (30%) sets. We fit logistic regression with natural cubic splines for age, BMI, waist circumference, and systolic BP, and gradient-boosted trees (XGBoost) tuned by 5-fold cross-validation,{{chen2016}} using survey weights as case weights. The model with the higher calibration-set area under the receiver operating characteristic curve (AUC) was prespecified for use. A secondary model targeted undiagnosed dysglycemia (diabetes or prediabetes).
+
+For a target sensitivity of 1 − α, we computed the score 1 − *p̂* for each calibration participant with the outcome and took its survey-weighted (1 − α)(1 + 1/*n*) quantile; adults with predicted risk above the corresponding threshold were flagged. If new adults are exchangeable with the calibration sample, this class-conditional split conformal procedure flags at least 1 − α of true cases.{{vovk,angelopoulos}} Weighting the quantile follows the weighted conformal framework and targets the population rather than the sample.{{tibshirani}} Applying the same procedure to noncases yielded a rule-out threshold, so each adult received a prediction set of "test," "rule out," or "uncertain." Targets were 80%, 90%, and 95%. A volume-matched rule flagged the same share of calibration-set adults as the USPSTF criteria.
+
+All rules were applied unchanged to adults without diagnosed diabetes in 2021-2023. We report the share flagged (screening volume), sensitivity, positive yield, number tested per case found, and share of USPSTF-ineligible cases captured, plus survey-weighted AUC (SEs from 200 subsampling bootstrap replicates) and calibration.
+
+### Statistical Analysis
+
+All estimates accounted for NHANES strata, primary sampling units, and weights: phlebotomy weights for HbA~1c~, examination weights for BP, and fasting weights for FPG. Pooled 2017-2023 weights were scaled by each cycle's share of the 5.2-year period. Subpopulations were analyzed as domains. Proportions have Korn-Graubard 95% CIs;{{korn}} where no case fell in a category we report the exact upper bound. Subgroups with fewer than 30 cases are flagged as imprecise.{{parker}}
+
+Sensitivity analyses added FPG of 126 mg/dL or higher to the diabetes definition, pooled 2017-2023 data, added family history and gestational diabetes to the ADA criteria in 2017-2020, and applied a BMI threshold of 25 to all groups. Analyses used R version 4.6.1 (R Foundation) with the survey and xgboost packages{{lumley}} and were performed in November 2026.
+
+## Results
+
+### Study Population
+
+The diabetes sample included `r n(FL$n_dm_final)` adults, `r n(FL$n_dm_dx)` with diagnosed diabetes. The `r n(FL$n_dm_nodx)` without a diagnosis represented `r t1[2, 2]` million US adults (weighted mean age, `r substr(t1[3, 2], 1, 4)` years; `r t1[12, 2]`% women) (Table 1). The hypertension sample included `r n(FL$n_htn_final)` adults.
+
+Undiagnosed diabetes was present in `r n(FL$n_undx_dm)` participants, or `r ci(pdm$p, pdm$lo, pdm$hi)` of US adults (`r r1(pdm$N)` million), and accounted for `r r1(res$share_undx$p)`% of all diabetes. Undiagnosed prediabetes affected `r ci(ppre$p, ppre$lo, ppre$hi)` (`r r1(ppre$N)` million) and undiagnosed hypertension `r ci(ph130$p, ph130$lo, ph130$hi)` at 130/80 mm Hg (`r r1(ph130$N)` million) and `r r1(ph140$p)`% at 140/90 mm Hg (eTable 2 in Supplement 1). Adults with undiagnosed diabetes were older than adults without diagnosed diabetes and more likely to have obesity (`r t1[34, 3]`% vs `r t1[34, 2]`%), to be Black (`r t1[15, 3]`% vs `r t1[15, 2]`%) or Hispanic (`r t1[16, 3]`% vs `r t1[16, 2]`%), and to have less than a high school education (`r t1[20, 3]`% vs `r t1[20, 2]`%); `r r1(res$overlap$p)`% also had undiagnosed hypertension.
+
+### Who Falls Outside Screening Criteria
+
+USPSTF criteria did not cover `r ci(o_dm_u$p, o_dm_u$lo, o_dm_u$hi)` of adults with undiagnosed diabetes, or `r cin(o_dm_u$N, o_dm_u$N_lo, o_dm_u$N_hi)` (Figure 1A). The upper age limit dominated: adults older than 70 years made up `r r1(rr("Undiagnosed diabetes", "Older than 70 y")$p)`% of undiagnosed diabetes, vs `r r1(rr("Undiagnosed diabetes", "Younger than 35 y")$p)`% for adults younger than 35 years and `r r1(rr("Undiagnosed diabetes", "Age 35-70 y, BMI below threshold")$p)`% for adults aged 35 to 70 years below the BMI threshold. Of the USPSTF-ineligible group, `r r0(g(mc, var == "age_cat", level == ">=71")$p)`% were 71 years or older and `r r0(g(mc, var == "race", level == "Non-Hispanic White")$p)`% were non-Hispanic White. For undiagnosed prediabetes, the gap was `r ci(o_pr_u$p, o_pr_u$lo, o_pr_u$hi)` (`r r1(o_pr_u$N)` million), spread across older adults (`r r1(rr("Undiagnosed prediabetes", "Older than 70 y")$p)`%), younger adults (`r r1(rr("Undiagnosed prediabetes", "Younger than 35 y")$p)`%), and adults below the BMI threshold (`r r1(rr("Undiagnosed prediabetes", "Age 35-70 y, BMI below threshold")$p)`%).
+
+ADA criteria covered every participant with undiagnosed diabetes (0 of `r FL$n_undx_dm`; upper 95% bound, `r ub(FL$n_undx_dm)`%) and missed `r ci(o_pr_a$p, o_pr_a$lo, o_pr_a$hi)` of undiagnosed prediabetes. They did so by applying to `r r1(A$volume)`% of adults without diagnosed diabetes (`r r0(A$N_screen)` million), vs `r r1(U$volume)`% (`r r0(U$N_screen)` million) for USPSTF criteria (Table 2).
+
+In pooled 2017-2023 data, the share of undiagnosed diabetes outside USPSTF criteria was higher in women (`r r1(fp("A", "Sex", "Female")$p)`%) than men (`r r1(fp("A", "Sex", "Male")$p)`%) and in non-Hispanic White adults (`r r1(fp("A", "Race and ethnicity", "Non-Hispanic White")$p)`%) than in Black (`r r1(fp("A", "Race and ethnicity", "Non-Hispanic Black")$p)`%), Hispanic (`r r1(fp("A", "Race and ethnicity", "Hispanic")$p)`%), or Asian (`r r1(fp("A", "Race and ethnicity", "Non-Hispanic Asian")$p)`%) adults (Figure 2). Using a BMI threshold of 25 for Asian adults changed estimates by less than 1 percentage point (eTable 3 in Supplement 1). For hypertension, `r ci(h(H130, "Less frequent")$p, h(H130, "Less frequent")$lo, h(H130, "Less frequent")$hi)` of undiagnosed cases were on the less intensive USPSTF schedule.
+
+### Delivery Gaps Among Eligible Adults
+
+Most undiagnosed disease occurred in eligible adults with access to care (Figure 1). Among USPSTF-eligible adults with undiagnosed diabetes, `r ci(g(ec, m == "Usual source of care")$p, g(ec, m == "Usual source of care")$lo, g(ec, m == "Usual source of care")$hi)` had a usual source of care, `r r1(g(ec, m == "Insured")$p)`% were insured, and `r ci(g(ec, m == "Blood test in past 3 y")$p, g(ec, m == "Blood test in past 3 y")$lo, g(ec, m == "Blood test in past 3 y")$hi)` reported a glucose test in the past 3 years. Across all undiagnosed diabetes, `r r1(test_dm)`% reported such a test, vs `r r1(tested_all)`% of all adults without diagnosed diabetes. Under ADA criteria, `r r1(cc("Undiagnosed diabetes", "ada_dm", "Eligible, in care, blood test in past 3 y")$p)`% of undiagnosed diabetes (`r r1(cc("Undiagnosed diabetes", "ada_dm", "Eligible, in care, blood test in past 3 y")$N)` million adults) was in eligible, insured adults with a usual source of care and recent testing, and another `r r1(cc("Undiagnosed diabetes", "ada_dm", "Eligible, in care, no recent blood test")$p)`% was in eligible adults in care without recent testing.
+
+Of the `r r1(ph130$N)` million adults with undiagnosed hypertension, `r ci(h(H130, "Insured with")$p, h(H130, "Insured with")$lo, h(H130, "Insured with")$hi)` were insured with a usual source of care (`r r1(h(H140, "Insured with")$p)`% at 140/90 mm Hg). Prevalence of undiagnosed hypertension did not differ meaningfully by insurance or usual source of care (eTable 6 in Supplement 1).
+
+### Risk Model and Conformal Rules
+
+Logistic regression had the higher calibration-set AUC and was carried forward. In 2021-2023, its AUC for undiagnosed diabetes was `r formatC(auc_dm$auc, format = "f", digits = 3)` (95% CI, `r formatC(auc_dm$auc_lo, format = "f", digits = 3)`-`r formatC(auc_dm$auc_hi, format = "f", digits = 3)`) (gradient boosting, `r formatC(auc_dmx$auc, format = "f", digits = 3)`). Mean predicted and observed risk agreed (`r r1(100 * auc_dm$exp)`% vs `r r1(100 * auc_dm$obs)`%), but a calibration slope of `r formatC(auc_dm$cal_slope, format = "f", digits = 2)` reflected overestimation in the top decile (Figure 3B; eTable 4 in Supplement 1).
+
+At nearly the USPSTF screening volume (`r r1(M$volume)`% vs `r r1(U$volume)`%), the volume-matched rule detected `r ci(M$sens, M$sens_lo, M$sens_hi)` of undiagnosed diabetes vs `r ci(U$sens, U$sens_lo, U$sens_hi)` for USPSTF criteria and captured `r r1(M$capture_missed)`% of USPSTF-missed cases; the number tested per case found fell from `r r1(U$nns)` to `r r1(M$nns)` (Table 2, Figure 3A). The 95% conformal rule flagged `r r1(C95$volume)`% of adults with `r r1(C95$sens)`% sensitivity. The 90% target was not met: that rule flagged `r r1(C90$volume)`% and detected `r ci(C90$sens, C90$sens_lo, C90$sens_hi)`; `r r1(g(sets, set10 == "Rule out {0}")$pct)`% of adults were ruled out, a group containing `r g(sets, set10 == "Rule out {0}")$cases` of `r FL$n_undx_dm` cases (eTable 5 in Supplement 1).
+
+For dysglycemia (AUC, `r formatC(auc_dg$auc, format = "f", digits = 3)`), conformal targets held: the 90% rule flagged `r r1(D90$volume)`% of adults with `r ci(D90$sens, D90$sens_lo, D90$sens_hi)` sensitivity, vs `r r1(DU$sens)`% for USPSTF and `r r1(DA$sens)`% for ADA criteria. The 90% diabetes rule detected `r r0(g(ss, var == "age_cat", level == ">=71")$conf10)`% of cases in adults 71 years or older, all outside USPSTF criteria, but `r r0(g(ss, var == "age_cat", level == "35-44")$conf10)`% in adults aged 35 to 44 years (`r g(ss, var == "age_cat", level == "35-44")$n` cases).
+
+### Sensitivity Analyses
+
+The share outside USPSTF criteria was similar with FPG added (`r r1(g(se, grepl("FPG", analysis), rule == "USPSTF 2021")$p)`%), in pooled 2017-2023 data (`r r1(g(se, analysis == "Pooled 2017-2023", rule == "USPSTF 2021")$p)`%), and in 2017-2020 (`r r1(g(se, analysis == "2017-2020 only", rule == "USPSTF 2021")$p)`%). Adding family history and gestational diabetes did not change ADA coverage (eTable 3 in Supplement 1).
+
+## Discussion
+
+In the first post-pandemic NHANES cycle, about one-third of US adults with undiagnosed diabetes and nearly half with undiagnosed prediabetes fell outside USPSTF screening criteria. For diabetes, the gap came almost entirely from the upper age limit; for prediabetes, younger and leaner adults also contributed. ADA criteria left almost no undiagnosed diabetes uncovered, but only by recommending testing for 5 of every 6 adults. The more consequential finding was that most undiagnosed diabetes and hypertension occurred in adults who were eligible, insured, and connected to a clinician, and nearly two-thirds of adults with undiagnosed diabetes reported a glucose test in the past 3 years.
+
+Our prevalence estimate agrees with NCHS reports and earlier NHANES analyses.{{gwira2024,fang2022}} Prior evaluations of USPSTF criteria used data collected before 2020.{{obrien2018,aggarwal2022,uspstf_eval}} Lowering the starting age to 35 years in 2021 appears to have closed most of the gap among younger adults with diabetes; fewer than 6% of undiagnosed cases in our data were younger than 35 years. What remains is largely about older adults. The USPSTF stopped at age 70 years because trial evidence of benefit is concentrated in middle age and the payoff from intensive glycemic control may outlast remaining life expectancy.{{uspstf_dm,leroith2019,ada_older}} Our results do not argue for blanket screening after 70 years. They do show that this group is large, about `r r1(rr("Undiagnosed diabetes", "Older than 70 y")$N)` million people, and many older adults have routine laboratory testing anyway. Acting on an elevated HbA~1c~ found incidentally, with individualized targets, differs from population screening and may be the more practical response.
+
+The racial and ethnic pattern needs careful reading. USPSTF criteria missed a larger share of undiagnosed diabetes in White adults, mostly because White adults with undiagnosed diabetes were older. This does not contradict evidence that minoritized groups develop diabetes at younger ages and lower BMI;{{aggarwal2022,hsu2015}} ADA criteria address it by treating minoritized race and ethnicity as a risk factor, one reason their coverage was nearly complete.
+
+Health care contact was the more important divide. Almost 9 in 10 USPSTF-eligible adults with undiagnosed diabetes had a usual source of care, and more than 6 in 10 recalled a glucose test. Some may have had a normal result and progressed since, some may misremember, and some may have been tested with FPG, which identifies a different and partly overlapping group than HbA~1c~.{{a1c_fpg}} It is also likely that abnormal results were not communicated, confirmed, or acted on. Only a small minority of adults with prediabetes report having been told,{{gopalan2015}} and more than three-quarters of adults with undiagnosed hypertension in our data were insured with a usual source of care, a group long described as "hiding in plain sight."{{wall2014}} BP control in the US has since worsened.{{muntner2020}} Electronic health record prompts for repeated elevated readings, reflex confirmatory testing after an abnormal HbA~1c~, and team-based follow-up target these missed opportunities without changing who is eligible.
+
+The risk model offers a different improvement. At about the USPSTF screening volume, a model using information available at any primary care visit detected 92% rather than 69% of undiagnosed diabetes, in large part by reaching adults older than 70 years. Questionnaire-based scores already exist,{{bang2009}} and, as in survey-based work on elevated BP, a flexible tree ensemble added little over well-specified logistic regression.{{nahin_prehtn}} The conformal layer adds a threshold derived from a stated sensitivity target rather than convention. Temporal validation showed the limits of that guarantee, which rests on exchangeability. For dysglycemia, with many calibration cases, coverage held; for diabetes, with only `r ml$undx_dm$pos_ca` calibration cases and a population that may have shifted after the pandemic, the 90% rule reached 83%. A deployed rule would need recalibration on recent local data, monitoring of realized sensitivity, and possibly group-conditional calibration for younger adults, where coverage was weakest.{{tibshirani,angelopoulos}}
+
+### Limitations
+
+This study has limitations. Undiagnosed diabetes was defined by a single HbA~1c~ without confirmatory testing, which overestimates disease relative to confirmed definitions, and HbA~1c~ is affected by anemia and hemoglobin variants;{{selvin2018}} results were similar when FPG was added. BP was measured at 1 visit, whereas diagnosis requires elevated readings on at least 2 occasions,{{acc2017}} so true undiagnosed hypertension is lower than our 130/80 mm Hg estimate. Diagnoses, care contact, and prior testing were self-reported, and the testing question does not capture the test type or result. The 2021-2023 cycle omitted family history, gestational diabetes, and visit counts, and its response rates were lower than in earlier cycles despite nonresponse-adjusted weights. Estimates for Asian adults and adults of other or multiple races were imprecise. Finally, the design is cross-sectional: it locates undiagnosed disease relative to screening rules but cannot show that detection improves outcomes, and the model has not been validated outside NHANES.
+
+## Conclusions
+
+In this cross-sectional study, USPSTF criteria missed about one-third of undiagnosed diabetes, mainly in adults older than 70 years, while ADA criteria missed almost none at the cost of near-universal eligibility. Most undiagnosed diabetes and hypertension was in adults who already met criteria and had access to care. Ensuring that eligible adults are tested and that abnormal results lead to a diagnosis may yield more than broadening eligibility, and risk-based rules with explicit sensitivity targets are a promising complement if recalibrated as populations change.
+
+\newpage
+
+## Article Information
+
+**Author Contributions:** [Author] had full access to all of the data in the study and takes responsibility for the integrity of the data and the accuracy of the data analysis. *Concept and design:* [ ]. *Acquisition, analysis, or interpretation of data:* [ ]. *Drafting of the manuscript:* [ ]. *Critical review of the manuscript for important intellectual content:* [ ]. *Statistical analysis:* [ ]. *Supervision:* [ ].
+
+**Conflict of Interest Disclosures:** [None reported.]
+
+**Funding/Support:** [ ]
+
+**Role of the Funder/Sponsor:** [ ]
+
+**Data Sharing Statement:** See Supplement 2. NHANES data are publicly available from the National Center for Health Statistics. Analysis code will be shared in a public repository.
+
+\newpage
+
+## References
+
+{{REFERENCES}}
+
+\newpage
+
+```{r tab1}
+t1 <- tb$t1
+names(t1)[1] <- "Characteristic"
+ft <- jama_ft(t1, widths = c(2.2, 1.25, 1.1, 1.15, 1.3), fs = 7.5)
+ft <- bold(ft, i = ~ grepl(", %$", Characteristic) & !grepl("^ ", Characteristic) & !grepl("insurance|Usual|glucose|Eligible", Characteristic), j = 1)
+ft <- set_caption(ft, caption = as_paragraph(as_chunk("Table 1. Characteristics of US Adults Without Diagnosed Diabetes and of Adults With Undiagnosed Diabetes, Prediabetes, or Hypertension, NHANES 2021-2023", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+ft <- add_footer_lines(ft, values = c(
+  "Abbreviations: ADA, American Diabetes Association; BMI, body mass index (calculated as weight in kilograms divided by height in meters squared); BP, blood pressure; HbA1c, hemoglobin A1c; NA, not applicable; NHANES, National Health and Nutrition Examination Survey; USPSTF, US Preventive Services Task Force.",
+  "Percentages are survey weighted. Diabetes columns use phlebotomy weights; the hypertension column uses examination weights. Undiagnosed diabetes: HbA1c ≥6.5% without a diagnosis. Undiagnosed prediabetes: HbA1c 5.7%-6.4% without a diabetes diagnosis or prior notification of prediabetes. Undiagnosed hypertension: mean BP ≥130/80 mm Hg without a diagnosis or treatment. Race and ethnicity were self-reported using NHANES categories."))
+ft <- fontsize(ft, size = 7, part = "footer")
+ft
+```
+
+\newpage
+
+```{r tab2}
+t2 <- tb$t2
+ft <- jama_ft(t2, widths = c(1.1, 1.5, 0.95, 0.7, 0.95, 0.6, 0.65, 1.05), fs = 7)
+ft <- merge_v(ft, j = 1)
+ft <- set_caption(ft, caption = as_paragraph(as_chunk("Table 2. Performance of Guideline and Risk-Based Screening Rules in Adults Without Diagnosed Diabetes, NHANES 2021-2023 (Temporal Validation)", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+ft <- add_footer_lines(ft, values = c(
+  "Abbreviations: ADA, American Diabetes Association; NHANES, National Health and Nutrition Examination Survey; USPSTF, US Preventive Services Task Force.",
+  "Risk-based rules were developed and calibrated in NHANES 2017-March 2020 and applied unchanged to 2021-2023. Conformal rules flag adults whose predicted risk exceeds a threshold chosen so that, under exchangeability, the stated share of true cases is flagged. The volume-matched rule flags the same share of calibration-set adults as USPSTF criteria. Positive yield is the share of flagged adults with the outcome; No. tested per case found is its reciprocal. The last column is the share of cases outside USPSTF criteria that each rule flags.",
+  "† No case was missed; the lower bound is the exact 1-sided 97.5% bound based on 150 unweighted cases."))
+ft <- fontsize(ft, size = 7, part = "footer")
+ft
+```
+
+\newpage
+
+## Figure Legends
+
+**Figure 1. Where Undiagnosed Diabetes, Prediabetes, and Hypertension Sit Relative to Screening Criteria and Health Care Contact, NHANES 2021-2023**
+
+Each bar shows the survey-weighted distribution of US adults with the undiagnosed condition across 4 mutually exclusive groups; the estimated number of affected adults is shown under each label. Diabetes and prediabetes are shown against the 2021 US Preventive Services Task Force (USPSTF) and 2025 American Diabetes Association (ADA) criteria. *For hypertension, which the USPSTF recommends screening in all adults, the first segment shows adults on the less intensive schedule (every 3-5 years: aged 20-39 years, not Black, body mass index <25). †For hypertension, this segment includes all eligible adults who were insured and had a usual source of care; NHANES does not ask about prior BP checks.
+
+```{r fig1, fig.width=7.5, fig.height=4.6}
+knitr::include_graphics(file.path(root, "figures/Figure1_criteria_vs_delivery.png"))
+```
+
+\newpage
+
+**Figure 2. Share of Undiagnosed Diabetes and Prediabetes Outside USPSTF 2021 Screening Criteria, by Subgroup**
+
+Points show survey-weighted percentages with 95% CIs; point size is proportional to the number of unweighted cases, shown at right. Diabetes estimates pool NHANES 2017-March 2020 and 2021-2023 to improve precision; prediabetes estimates use 2021-2023. All adults aged 20 to 34 years or 71 years or older are outside USPSTF criteria by definition. Dashed lines show the overall share. BMI is calculated as weight in kilograms divided by height in meters squared.
+
+```{r fig2, fig.width=7.5, fig.height=6.4}
+knitr::include_graphics(file.path(root, "figures/Figure2_subgroups.png"))
+```
+
+\newpage
+
+**Figure 3. Risk-Based Screening for Undiagnosed Diabetes With Conformal Thresholds, Temporal Validation in NHANES 2021-2023**
+
+A, Survey-weighted share of adults without diagnosed diabetes flagged for testing (x-axis) vs share of undiagnosed diabetes detected (y-axis). The blue line traces the logistic regression risk model across all thresholds; circles show conformal rules with 80%, 90%, and 95% sensitivity targets set in the 2017-2020 calibration sample; squares show guideline criteria. Vertical bars are 95% CIs. The dotted line is random selection. B, Calibration by decile of predicted risk; the dotted line shows perfect calibration.
+
+```{r fig3, fig.width=7.5, fig.height=3.6}
+knitr::include_graphics(file.path(root, "figures/Figure3_model_conformal.png"))
+```
+
+\newpage
+
+# Supplement 1
+
+**eMethods.** Operational Definitions and Conformal Procedure
+
+**eTable 1.** Operational Definitions of Outcomes, Screening Criteria, and Care Measures
+
+**eTable 2.** Prevalence, National Counts, and Share Outside Screening Criteria
+
+**eTable 3.** Sensitivity Analyses
+
+**eTable 4.** Risk Model Development and Validation Performance
+
+**eTable 5.** Conformal Thresholds, Prediction Sets, and Subgroup Detection
+
+**eTable 6.** Undiagnosed Hypertension by Subgroup and Health Care Contact
+
+**eFigure 1.** Participant Flow Diagram
+
+\newpage
+
+## eMethods
+
+**Data files.** We merged the demographics, body measures, oscillometric BP, glycohemoglobin, fasting glucose, HDL cholesterol, triglycerides, diabetes, BP and cholesterol, medical conditions, health insurance, hospital utilization and access to care, smoking, physical activity, and (2017-2020 only) reproductive health files for each cycle by respondent sequence number. Physical inactivity was defined as no moderate or vigorous leisure-time physical activity, using the activity questions available in each cycle.
+
+**Weights.** HbA~1c~ was measured in the phlebotomy sample. In 2021-2023, we used the 2-year phlebotomy weight; in 2017-2020, where no phlebotomy weight is released, we used the examination weight. Pooled weights were the cycle weight multiplied by 3.2/5.2 (2017-2020) or 2.0/5.2 (2021-2023).
+
+**Conformal procedure.** Let *p̂*(*x*) be the predicted probability of undiagnosed diabetes. In the calibration set, for each participant with the outcome (*n* = `r ml$undx_dm$pos_ca`), the nonconformity score is *s* = 1 − *p̂*. With normalized survey weights *w*, we computed the weighted quantile *q̂* of *s* at level min{1, ⌈(*n* + 1)(1 − α)⌉/*n*}. A new adult is flagged if 1 − *p̂*(*x*) ≤ *q̂*, that is, if *p̂*(*x*) ≥ 1 − *q̂*. For noncases, the score is *s* = *p̂*, and the label "no diabetes" is included in the prediction set if *p̂*(*x*) is at or below the corresponding quantile. Adults whose set contains only "no diabetes" are ruled out; only "diabetes," flagged; both, uncertain. Under exchangeability between calibration and new adults, the probability that a true case is flagged is at least 1 − α. The 2021-2023 cycle tests this assumption under real temporal shift.
+
+**Missing predictors.** Waist circumference, income-to-poverty ratio, education, and physical activity were missing for some participants. For logistic regression, missing values were imputed with training-set medians (after one-hot coding); XGBoost handled missing values natively.
+
+\newpage
+
+```{r etab1}
+e1 <- data.frame(
+  Item = c("Undiagnosed diabetes", "Undiagnosed prediabetes", "Diagnosed diabetes", "Undiagnosed hypertension",
+           "USPSTF 2021 diabetes criteria", "ADA 2025 diabetes criteria", "ADA risk factors operationalized",
+           "USPSTF 2021 hypertension schedule", "Health insurance", "Usual source of care", "Glucose test in past 3 y"),
+  Definition = c(
+    "HbA1c ≥6.5% and answer 'no' or 'borderline' to 'Other than during pregnancy, have you ever been told by a doctor or health professional that you have diabetes or sugar diabetes?' (DIQ010)",
+    "HbA1c 5.7%-6.4%, no diabetes diagnosis, never told of prediabetes (DIQ160) and not told borderline diabetes (DIQ010 = 3)",
+    "DIQ010 = 1 (excluded from undiagnosed counts; included in denominator of share undiagnosed)",
+    "Mean of up to 3 oscillometric readings ≥130/80 mm Hg (secondary, ≥140/90 mm Hg); never told high BP (BPQ020) and not taking BP medication",
+    "Age 35-70 y and BMI ≥25 (≥23 for non-Hispanic Asian adults). Sensitivity analysis: BMI ≥25 for all",
+    "Any of: age ≥35 y; prior prediabetes or borderline diabetes; BMI ≥25 (≥23 Asian) plus ≥1 risk factor. 2017-2020 sensitivity analysis added family history in a first-degree relative (MCQ300C) and gestational diabetes (RHQ162)",
+    "Race and ethnicity other than non-Hispanic White; coronary heart disease, angina, myocardial infarction, heart failure, or stroke; diagnosed or treated hypertension or measured BP ≥130/80 mm Hg; HDL <35 mg/dL or triglycerides >250 mg/dL (fasting subsample); no leisure-time physical activity",
+    "Annual screening for age ≥40 y, Black race, or BMI ≥25; every 3-5 y for age 20-39 y, not Black, BMI <25 (less intensive schedule)",
+    "Currently covered by any health insurance (HIQ011)",
+    "Has a place usually gone to when sick or needing advice about health (HUQ030 = yes or more than 1 place)",
+    "Reported a blood test for high blood sugar or diabetes in the past 3 years (DIQ180)"))
+ft <- jama_ft(e1, widths = c(1.7, 5.3), fs = 7.5)
+set_caption(ft, caption = as_paragraph(as_chunk("eTable 1. Operational Definitions of Outcomes, Screening Criteria, and Care Measures", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+\newpage
+
+```{r etab2}
+ft <- jama_ft(tb$e2a, widths = c(2.6, 1.0, 1.7, 1.9), fs = 7.5)
+set_caption(ft, caption = as_paragraph(as_chunk("eTable 2. Prevalence, National Counts, and Share Outside Screening Criteria, NHANES 2021-2023. A, Prevalence", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+```{r etab2b}
+ft <- jama_ft(tb$e2b, widths = c(1.8, 2.0, 1.6, 1.9), fs = 7.5) |> merge_v(j = 1)
+ft <- add_footer_lines(ft, "‡ No case fell outside the ADA criteria; upper bound is the exact 1-sided 97.5% bound based on unweighted cases.") |> fontsize(size = 7, part = "footer")
+set_caption(ft, caption = as_paragraph(as_chunk("B, Share of undiagnosed cases outside each set of criteria", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+```{r etab2c}
+ft <- jama_ft(tb$e2c, widths = c(1.8, 2.3, 0.9, 1.5, 0.8), fs = 7.5) |> merge_v(j = 1)
+set_caption(ft, caption = as_paragraph(as_chunk("C, USPSTF 2021 eligibility status among undiagnosed cases", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+\newpage
+
+```{r etab3}
+ft <- jama_ft(tb$e3, widths = c(2.9, 1.9, 0.9, 1.6), fs = 7.5) |> merge_v(j = 1)
+ft <- add_footer_lines(ft, "All analyses refer to undiagnosed diabetes unless stated. FPG indicates fasting plasma glucose; ADA, American Diabetes Association; GDM, gestational diabetes; USPSTF, US Preventive Services Task Force.") |> fontsize(size = 7, part = "footer")
+set_caption(ft, caption = as_paragraph(as_chunk("eTable 3. Sensitivity Analyses: Share of Undiagnosed Cases Outside Screening Criteria", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+\newpage
+
+```{r etab4}
+ft <- jama_ft(tb$e4dev, widths = c(2.4, 1.5, 1.5, 1.5), fs = 7.5)
+set_caption(ft, caption = as_paragraph(as_chunk("eTable 4. Risk Model Development and Validation Performance. A, Sample sizes (unweighted)", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+```{r etab4b}
+ft <- jama_ft(tb$e4, widths = c(1.3, 1.3, 0.55, 0.75, 1.1, 0.7, 0.75, 0.85, 0.55), fs = 7) |> merge_v(j = 1)
+ft <- add_footer_lines(ft, "B, Discrimination and calibration. AUC indicates area under the receiver operating characteristic curve. Validation metrics are survey weighted; AUC 95% CIs use 200 subsampling bootstrap replicate weights. Calibration slope <1 indicates predictions that are too extreme. The model with the higher calibration-split AUC was prespecified for use in screening rules.") |> fontsize(size = 7, part = "footer")
+ft
+```
+
+\newpage
+
+```{r etab5}
+ft <- jama_ft(tb$e5thr, widths = c(1.6, 2.2, 2.2), fs = 7.5)
+set_caption(ft, caption = as_paragraph(as_chunk("eTable 5. Conformal Thresholds, Prediction Sets, and Subgroup Detection (Undiagnosed Diabetes). A, Thresholds from the 2017-2020 calibration set", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+```{r etab5b}
+ft <- jama_ft(tb$sets, widths = c(2.4, 1.3, 1.3, 1.6), fs = 7.5)
+set_caption(ft, caption = as_paragraph(as_chunk("B, Prediction sets at the 90% level, NHANES 2021-2023", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+```{r etab5c}
+ft <- jama_ft(tb$e5, widths = c(1.5, 1.7, 0.9, 1.4, 1.7), fs = 7.5) |> merge_v(j = 1)
+ft <- add_footer_lines(ft, "Survey-weighted share of undiagnosed diabetes cases flagged by each rule, NHANES 2021-2023. Subgroups with fewer than 30 cases are imprecise.") |> fontsize(size = 7, part = "footer")
+set_caption(ft, caption = as_paragraph(as_chunk("C, Detection by subgroup", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+\newpage
+
+```{r etab6}
+ft <- jama_ft(tb$e6, widths = c(1.6, 1.6, 1.1, 1.5, 1.5), fs = 7.5) |> merge_v(j = 1)
+set_caption(ft, caption = as_paragraph(as_chunk("eTable 6. Undiagnosed Hypertension by Subgroup and Health Care Contact, NHANES 2021-2023. A, Prevalence among adults without diagnosed or treated hypertension", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+```{r etab6b}
+ft <- jama_ft(tb$e6b, widths = c(2.0, 2.8, 1.4, 0.8), fs = 7.5) |> merge_v(j = 1)
+set_caption(ft, caption = as_paragraph(as_chunk("B, Screening schedule and health care contact among adults with undiagnosed hypertension", props = fp_text(bold = TRUE, font.family = "Arial", font.size = 9))), align_with_table = FALSE)
+```
+
+\newpage
+
+**eFigure 1. Participant Flow Diagram**
+
+```{r efig1, fig.width=7.5, fig.height=4.4}
+knitr::include_graphics(file.path(root, "figures/eFigure1_flow.png"))
+```

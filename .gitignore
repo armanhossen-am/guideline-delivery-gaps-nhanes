@@ -1,0 +1,19 @@
+# Data (public NHANES files; re-download with R/00_download.R)
+data/
+# Generated results, figures, documents
+output/
+figures/
+*.docx
+!manuscript/reference.docx
+!manuscript/reference_letter.docx
+*.pdf
+manuscript/manuscript.Rmd
+manuscript/cover_letter.md
+brief/brief.typ
+brief/*.png
+# R / OS
+.Rhistory
+.RData
+.Rproj.user/
+Rplots.pdf
+.DS_Store
